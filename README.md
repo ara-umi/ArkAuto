@@ -1,8 +1,9 @@
 <h1><div align=center>明日方舟后台脚本</div></h1>
 
 <div align=center>
-  <img src="https://github.com/ara-umi/ArkAuto/blob/main/READMEIMAGE/immediately.jpg">我知道了！马上改！
+  <img src="https://github.com/ara-umi/ArkAuto/blob/main/READMEIMAGE/immediately.jpg" width=600 height=550></br>他们说第一张图一定要吸引人
   </div>
+  
 
 <h2>想说的话</h2>
 
