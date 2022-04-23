@@ -1,2 +1,3 @@
-<div align="center"><font color="#FF4500">明日方舟后台脚本【非常后，非常台】</font></div>
+<h2 style="text-align:center"><font color="#FF0000">明</font><font color="#FF7F00">日</font><font color="#FFFF002 ">方</font><font color="#00FF00">舟</font><font color="#00FFFF">后</font><font color="#0000FF">台</font><font color="#8B00FF">脚</font><font color="#FF0000">本</font></h2>
+---
 
