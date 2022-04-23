@@ -1,6 +1,6 @@
 <h1><div align=center>明日方舟后台脚本</div></h1>
 
-<center>![吸引人的看板图](https://github.com/ara-umi/ArkAuto/blob/main/READMEIMAGE/immediately.jpg "我知道了，马上改！")</center>
+<div align=center>![吸引人的看板图](https://github.com/ara-umi/ArkAuto/blob/main/READMEIMAGE/immediately.jpg "我知道了，马上改！")<div>
 
 <h2>想说的话</h2>
 
