@@ -1,9 +1,21 @@
 from mywin32.handle import HandleGetter
 
-# 模拟器类型
-getHandle = HandleGetter.Nox()
-# getHandle = HandleGetter.LeiDian()
 
+# 模拟器类型
+def getHandle():
+    return HandleGetter.Nox()
+    # return HandleGetter.LeiDian()
+
+
+# 分辨率
+w = 1600
+h = 900
+
+# 自适应分辨率
+selfAdaptation = 1
+
+# 默认截图存储名称/格式
+default_save_name = "screenshot.bmp"
 
 # 匹配参数
 thresh = 0.95

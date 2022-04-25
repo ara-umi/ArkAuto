@@ -1,7 +1,9 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
-root = "../image/"
+import os
+image_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+root = image_dir + "/image/"
 suffix = ".png"
 
 

@@ -7,10 +7,10 @@ import win32api
 import win32con
 import win32gui
 
+import keydict
 import mywin32con as con
 from handle import HandleGetter
 from hexHelper import d2bK, d2xK
-import keydict
 
 
 def _makeMouseActiveLpara(msg, hittest):
@@ -53,7 +53,7 @@ def _makeLong(position):
     return win32api.MAKELONG(*position)
 
 
-def clickInput(handle, position, button, delay=0.1):
+def clickInput(handle, position, button, delay=0):
     """
     :param handle:
     :param position: tuple
@@ -62,7 +62,6 @@ def clickInput(handle, position, button, delay=0.1):
         RIGHT_BUTTON = 0
         MID_BUTTON = 2
     :param delay: sleep time(default 0)
-    :return: None
     """
     lpara = _makeLong(position)
     if button == con.LEFT_BUTTON:
@@ -203,6 +202,7 @@ def presKeyConstant(handle, key: str, extend=0, *, press_time=1):
 def scrollV(handle, rotate: int, position, *, add_key=0):
     """
     模拟鼠标竖直方向滚动
+    不同窗口对滚动敏感度不一样，若无法实现滚动，请尝试用rotate=1并外加for循环和sleep的方法
     :param handle: hWnd
     :param rotate: 格数，以WHEEL_DELTA=120为基数，滚多少格，正为上滚，负为下滚
     :param position: 滚动位置
@@ -251,28 +251,41 @@ def _makeDragRoute(start, end):
     :param end: tuple
     :return: generator
     """
-    H = abs(start[0] - end[0])
-    V = abs(start[1] - end[1])
-    if H >= V:
-        k = (start[1] - end[1]) / (start[0] - end[0])
-        b = start[1] - start[0] * k
-        for x in range(start[0], end[0]):
-            yield x, round(x * k + b)
+
+    dw = end[0] - start[0]
+    dh = end[1] - start[1]
+
+    # 十字方向单独讨论
+    if dw == 0:
+        sign = int(dh / abs(dh))
+        for h in range(1, abs(dh)):
+            yield start[0], start[1] + h * sign
+
+    elif dh == 0:
+        sign = int(dw / abs(dw))
+        for w in range(1, abs(dw)):
+            yield start[0] + w * sign, start[1]
     else:
-        k = (start[0] - end[0]) / (start[1] - end[1])
-        b = start[0] - start[1] * k
-        for y in range(start[1], end[1]):
-            yield round(y * k + b), y
+        if abs(dw) >= abs(dh):
+            k = (start[1] - end[1]) / (start[0] - end[0])
+            sign = int(dw / abs(dw))
+            for w in range(1, abs(dw)):
+                yield start[0] + w * sign, int(start[1] + w * k * sign)
+        else:
+            k = (start[0] - end[0]) / (start[1] - end[1])
+            sign = int(dh / abs(dh))
+            for h in range(1, dh):
+                yield int(start[0] + h * k * sign), start[1] + h * sign
 
 
-def drag(handle, start, end, interval=0.01, wait_time=1):
+def drag(handle, start, end, interval=0.005, wait_time=0.5):
     """
     模拟拖动
-    测试发现wpara为0或MK_LBUTTON并没有区别，等待进一步测试
+    测试发现wpara为0和MK_LBUTTON有时候没有区别，等待进一步测试
     :param handle: hWnd
     :param start: tuple
     :param end: tuple
-    :param interval: 休眠时间，即拖动一个像素休眠的时间，0.01算慢的
+    :param interval: 休眠时间，即拖动一个像素休眠的时间，0.005算慢的
     :param wait_time: 拖动前后等待时间，一些案件需要按下后一段时间才响应
     :return:
     """
@@ -282,8 +295,8 @@ def drag(handle, start, end, interval=0.01, wait_time=1):
     time.sleep(wait_time)
     for position in _makeDragRoute(start, end):
         positionLPara = _makeLong(position)
-        win32gui.PostMessage(handle, win32con.WM_MOUSEMOVE, 0x00000000, positionLPara)
-        # win32gui.PostMessage(handle, win32con.WM_MOUSEMOVE, win32con.MK_LBUTTON, positionLPara)
+        # 用send和post没啥区别，都会出现点阵先密后疏
+        win32gui.PostMessage(handle, win32con.WM_MOUSEMOVE, win32con.MK_LBUTTON, positionLPara)
         time.sleep(interval)
     time.sleep(wait_time)
     win32gui.PostMessage(handle, win32con.WM_LBUTTONUP, 0x00000000, endLPara)
@@ -295,15 +308,18 @@ def captureChanged(handle):
 
 
 if __name__ == '__main__':
-    simulatorHandle, clientHandle = HandleGetter.LeiDian()
-    print(f"主窗口句柄:{d2xK(simulatorHandle, 8)}\n客户区句柄:{d2xK(clientHandle, 8)}")
+    # simulatorHandle, clientHandle = HandleGetter.LeiDian()
+    simulatorHandle, clientHandle = HandleGetter.Nox()
+    # print(f"主窗口句柄:{d2xK(simulatorHandle, 8)}\n客户区句柄:{d2xK(clientHandle, 8)}")
 
     # activate(clientHandle, simulatorHandle)
     # 拖动测试
     startPosition = (253, 106)
     endPosition = (527, 265)
     endPosition1 = (258, 430)
-    drag(clientHandle, startPosition, endPosition)
+    endPosition2 = (253, 430)
+    endPosition3 = (440, 106)
+    drag(clientHandle, startPosition, endPosition3)
 
     # 滚轮测试
     # scrollV(clientHandle, -1, (200, 200))

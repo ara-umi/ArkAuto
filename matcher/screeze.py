@@ -8,18 +8,20 @@
     3.查看dxdiag，尝试禁用所有directx相关功能，禁用方法使用“禁用directx.reg，启用使用修复工具
 """
 
+import os
 from ctypes import windll, byref, c_ubyte
 from ctypes.wintypes import RECT
-from matcher.base import MyCv2
-from mywin32.handle import HandleGetter
 
 import numpy as np
 import win32con
 import win32gui
 import win32ui
 
+from matcher.base import MyCv2
+from mywin32.handle import HandleGetter
+from arkauto.setting import default_save_name
+default_save_dir = default_record_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__))) + r"\screenshot"
 
-default_save_path = "../screenshot/screenshot.bmp"
 
 
 class WindowShooter(object):
@@ -27,10 +29,16 @@ class WindowShooter(object):
     用于截取/储存/读取窗口画面
     修改统一的储存路径请用类方法
     """
-    _save_path = default_save_path
+    _save_path = default_save_dir + "\\" + default_save_name
 
     def __init__(self, handle):
         self.handle = handle
+        self.init_save_path()
+
+    @staticmethod
+    def init_save_path():
+        if not os.path.exists(default_save_dir):
+            os.mkdir(default_save_dir)
 
     @property
     def save_path(self):
@@ -77,6 +85,7 @@ class WindowShooter(object):
         # 返回图像位置
         return self._save_path
 
+    # 不常用，虽然更合理
     def screenshot_np(self):
         """
         截图并返回ndarray

@@ -1,11 +1,12 @@
+import os
 import time
 
 import cv2
 
+from base import MyCv2
 from helper.helper import now_time
-from .base import MyCv2
 
-default_record_dir = "../record/"
+default_record_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__))) + r"\record"
 template_method = cv2.TM_SQDIFF_NORMED
 
 
@@ -16,10 +17,14 @@ class Template(MyCv2):
 
     @staticmethod
     def make_record():
-        record_name = default_record_dir + now_time() + ".txt"
-        with open(record_name, "a+"):
+        if not os.path.exists(default_record_dir):
+            os.mkdir(default_record_dir)
+
+        record_name = now_time() + ".txt"
+        record_path = default_record_dir + "\\" + record_name
+        with open(record_path, "a+"):
             pass
-        return record_name
+        return record_path
 
     @property
     def record(self):
@@ -28,7 +33,7 @@ class Template(MyCv2):
     def write_record(self, txt, time_on=False):
         with open(self._record, "a+") as f:
             if time_on:
-                f.write(f"{(time.strftime('%m-%d %H:%M:%S', time.localtime()))}\n\n")
+                f.write(f"\n{(time.strftime('%m-%d %H:%M:%S', time.localtime()))}")
             f.write(f"{txt}\n")
 
     @staticmethod
@@ -109,5 +114,4 @@ class Template(MyCv2):
 template = Template()
 
 if __name__ == '__main__':
-    matcher = Template()
-    print(matcher.record)
+    pass

@@ -1,7 +1,13 @@
 #!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
+import ctypes
 import time
+import traceback
+
+import cv2
+import win32con
+import win32gui
 
 import setting
 from arkerror import UnknownError, NoBrainError, AssertError
@@ -17,9 +23,20 @@ from position import ark_position
 
 class ArkBase(object):
     def __init__(self):
-        self._simulatorHandle, self._clientHandle = setting.getHandle
-        HandleGetter.simulatorInit(self.simulatorHandle)
+        self._simulatorHandle, self._clientHandle = setting.getHandle()
         self.shooter = WindowShooter(self._clientHandle)
+        self._getFxFy()
+
+    # 自适应比例
+    def _getFxFy(self):
+        image_path = self.shooter.screenshot()
+        image = template.read(image_path)
+        shape = image.shape
+        self.fx = shape[1] / setting.w
+        self.fy = shape[0] / setting.h
+
+    def initWindow(self):
+        HandleGetter.simulatorInit(self.simulatorHandle)
 
     @property
     def simulatorHandle(self):
@@ -27,10 +44,18 @@ class ArkBase(object):
 
     @property
     def clientHandle(self):
-        return self._simulatorHandle
+        return self._clientHandle
 
+    # 重写增加自适应功能
     def screenshot(self):
-        return self.shooter.screenshot()
+        if setting.selfAdaptation:
+            image_path = self.shooter.screenshot()
+            original = template.read(image_path)
+            resize = cv2.resize(original, (setting.w, setting.h), interpolation=cv2.INTER_LINEAR)
+            cv2.imwrite(image_path, resize)
+            return image_path
+        else:
+            return self.shooter.screenshot()
 
     # 模板匹配按键
     def findButton(self, template_path, *, thresh=setting.thresh, read_mode=setting.read_mode, wait_time=0.0,
@@ -47,19 +72,19 @@ class ArkBase(object):
         """
         template_name = template_path.split("/")[-1]
         time.sleep(wait_time)
-        print(f"开始匹配：{template_name}")
+        print(f"\t开始匹配：{template_name}")
         startTime = time.time()
         while True:
             image_path = self.screenshot()
             centers = template.get_location(template_path, image_path, thresh, read_mode, 1, draw)
             if centers:
-                print(f"获取到匹配：{centers[0]}")
+                print(f"\t获取到匹配：{centers[0]}")
                 return centers[0]
             else:
                 if time.time() - startTime < timeout:
                     time.sleep(setting.find_button_interval)
                 else:
-                    print("超时未匹配")
+                    print("\t超时未匹配")
                     return
 
     # 模板匹配按键(Knn)
@@ -68,6 +93,7 @@ class ArkBase(object):
         """
          自带截图功能的模板匹配，可以匹配多个对象，部分参数请参考template.get_location
          :param template_path: 模板路径
+         :param k: Knn
          :param thresh: 匹配阈值
          :param read_mode: BGR 1/GRAY 0
          :param wait_time: 匹配前等待时间，默认为0
@@ -77,29 +103,49 @@ class ArkBase(object):
          """
         template_name = template_path.split("/")[-1]
         time.sleep(wait_time)
-        print(f"开始匹配：{template_name}")
+        print(f"\t开始匹配：{template_name}")
         startTime = time.time()
         while True:
             image_path = self.screenshot()
             centers = template.get_location(template_path, image_path, thresh, read_mode, k, draw)
             if centers:
-                print(f"获取到匹配：{centers}")
+                print(f"\t获取到匹配：{centers}")
                 return centers
             else:
                 if time.time() - startTime < timeout:
                     time.sleep(setting.find_button_interval)
                 else:
-                    print("超时未匹配")
+                    print("\t超时未匹配")
                     return []
 
-    # 简单点击客户position函数，用于简化大部分代码
+    def makeAdaptationPosition(self, position):
+        return int(position[0] * self.fx), int(position[1] * self.fy)
+
+    # 自定义简单点击函数，自带自适应(识别最近一次)
     def simpleClick(self, position):
+        """
+        :param position: 点击位置
+        setting.selfAdaptation :
+            是否通过初始化时得到的缩放比自适应窗口大小
+            因为缩放比是类初始化时得到的，所以脚本运行后调整窗口大小会出错
+                当然是可以每次操作前都重新获取缩放比的，怕影响速度(写个进程检测感觉挺多此一举的)
+            其他的操作是不带缩放功能的，可以用makeAdaptation...慢慢重写
+            拖动函数就重写了，其实很简单就是把起点终点都缩放处理就可以了
+        :return:
+        """
         if not position:
             raise AssertError
-        messeger.clickInput(self.clientHandle, position, con.LEFT_BUTTON)
+        if setting.selfAdaptation:
+            position = self.makeAdaptationPosition(position)
+            messeger.clickInput(self.clientHandle, position, con.LEFT_BUTTON)
 
 
 class LoopBattle(ArkBase):
+    """
+    重复战斗功能区
+    剿灭功能写在别处了(新建文件夹)
+    """
+
     def __init__(self):
         super(LoopBattle, self).__init__()
 
@@ -162,7 +208,7 @@ class LoopBattle(ArkBase):
     @count_time_self
     def run(self):
         print("""
-------------------------------------------------------
+----------------------------------------------------------------
             非常稳定的明日方舟后台刷图脚本
 说明：
     1.该脚本可以后台运行，但不支持最小化
@@ -170,43 +216,65 @@ class LoopBattle(ArkBase):
     3.刷够次数或理智耗尽(达到补充上限)脚本会自动退出
     4.补充理智逻辑为：有啥点啥(懒死了不想写很复杂的逻辑)
     5.极有可能发生各种意外情况，因为bug也是程序的一部分
-------------------------------------------------------
+----------------------------------------------------------------
 
 """)
 
-        loops = input("请输入刷图次数(回车为刷到死)：")
+        # 输入信息，如果都Enter，要敲Enter三次
+        loops = input("请输入刷图次数(Enter为刷到死)：")
         if not loops:
             loops = 999
         else:
             loops = int(loops)
 
-        replenishTimes = input("请输入理智补充次数(回车为不补充)：")
+        replenishTimes = input("请输入理智补充次数(Enter为不补充)：")
         if not replenishTimes:
             replenishTimes = 0
         else:
             replenishTimes = int(replenishTimes)
 
-        nowReplenish = 0
+        # 最小化cmd
+        ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 6)
 
+        # 激活模拟器窗口或置底
+        self.initWindow()
+
+        nowReplenish = 0
         i = 1
-        while i <= loops:
-            print("\n---------------------------------------------------")
-            print_now_time()
-            print(f"当前第{i}次战斗\n")
-            try:
-                self.preBattle()
-            except NoBrainError:
-                if nowReplenish < replenishTimes:
-                    self.replenish()
-                    nowReplenish += 1
-                    print(f"第{nowReplenish}次补充理智")
-                    continue
-                else:
-                    print(f"\n已达到理智补充次数上限, 共刷了{i}次")
-                    return
-            self.afterBattle()
-            i += 1
-        print(f"\n刷图{loops}次已全部完成！")
+
+        try:
+            while i <= loops:
+                print("\n----------------------------------------------------------------")
+                print_now_time()
+                print(f"当前第{i}次战斗\n")
+                try:
+                    self.preBattle()
+
+                # 理智不足
+                except NoBrainError:
+                    if nowReplenish < replenishTimes:
+                        self.replenish()
+                        nowReplenish += 1
+                        print(f"第{nowReplenish}次补充理智")
+                        continue
+                    else:
+                        print(f"\n已达到理智补充次数上限, 共刷了{i}次")
+                        return
+
+                self.afterBattle()
+                i += 1
+
+            # 如果你想要结束后不要自动弹窗，请注释掉下面这一行
+            ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), win32con.SW_RESTORE)
+            print(f"\n刷图{loops}次已全部完成！")
+
+        except:
+            # 打印traceback
+            info = traceback.format_exc()
+            print(info)
+
+            # 如果你想要出错后不要自动弹窗，请注释掉下面这一行
+            ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), win32con.SW_RESTORE)
 
 
 if __name__ == '__main__':

@@ -17,3 +17,8 @@ class NoBrainError(Exception):
 
 class UnknownError(Exception):
     pass
+
+
+# 发现没有需要休息的干员时抛出的异常，用于提前停止脚本
+class NoNeedRestError(Exception):
+    pass
