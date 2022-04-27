@@ -17,11 +17,11 @@ import win32con
 import win32gui
 import win32ui
 
+from setting import default_save_name
 from matcher.base import MyCv2
 from mywin32.handle import HandleGetter
-from arkauto.setting import default_save_name
-default_save_dir = default_record_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__))) + r"\screenshot"
 
+default_save_dir = default_record_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__))) + r"\screenshot"
 
 
 class WindowShooter(object):
@@ -128,8 +128,10 @@ class WindowShooter(object):
 
 
 if __name__ == '__main__':
-    simulatorHandle, clientHandle = HandleGetter.Nox()
-    shooter = WindowShooter(clientHandle)
+    # simulatorHandle, clientHandle = HandleGetter.LeiDian()
+    # simulatorHandle, clientHandle = HandleGetter.Nox()
+    simulatorHandle, clientHandle = HandleGetter.Xiaoyao()
+    shooter = WindowShooter(simulatorHandle)
     res_path = shooter.screenshot()
     res = shooter.screenshot_np()
     mycv2 = MyCv2()

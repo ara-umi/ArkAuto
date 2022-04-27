@@ -1,10 +1,9 @@
 import os
-import time
 
 import cv2
 
 from base import MyCv2
-from helper.helper import now_time
+from logger import get_logger
 
 default_record_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__))) + r"\record"
 template_method = cv2.TM_SQDIFF_NORMED
@@ -13,28 +12,11 @@ template_method = cv2.TM_SQDIFF_NORMED
 class Template(MyCv2):
     def __init__(self):
         super(Template, self).__init__()
-        self._record = self.make_record()
-
-    @staticmethod
-    def make_record():
-        if not os.path.exists(default_record_dir):
-            os.mkdir(default_record_dir)
-
-        record_name = now_time() + ".txt"
-        record_path = default_record_dir + "\\" + record_name
-        with open(record_path, "a+"):
-            pass
-        return record_path
+        self._logger = get_logger()
 
     @property
-    def record(self):
-        return self._record
-
-    def write_record(self, txt, time_on=False):
-        with open(self._record, "a+") as f:
-            if time_on:
-                f.write(f"\n{(time.strftime('%m-%d %H:%M:%S', time.localtime()))}")
-            f.write(f"{txt}\n")
+    def logger(self):
+        return self._logger
 
     @staticmethod
     def _get_radius(h, w):
@@ -58,8 +40,7 @@ class Template(MyCv2):
         """
         template_name = template_path.split("/")[-1]
         image_name = image_path.split("/")[-1]
-
-        self.write_record(f"\n开始匹配对象：{template_name}", time_on=True)
+        self.logger.info(f"开始匹配对象：{template_name}")
 
         template = self.read(template_path, flags)
         image = self.read(image_path, flags)
@@ -86,14 +67,14 @@ class Template(MyCv2):
                 break
 
         if not centers:
-            self.write_record(f"定位为空:{template_name}")
+            self.logger.warning(f"定位为空:{template_name}")
             return []
         else:
-            self.write_record(f"找到{len(centers)}处匹配 (当前最大匹配数：{k})")
+            self.logger.info(f"找到{len(centers)}处匹配 (当前最大匹配数：{k})")
             if k == 1:
-                self.write_record(f"匹配位置信息：{centers[0]}")
+                self.logger.info(f"匹配位置信息：{centers[0]}")
             else:
-                self.write_record(f"匹配位置信息：{centers}")
+                self.logger.info(f"匹配位置信息：{centers}")
         # 展示结果
         if draw:
             canvas = image.copy()

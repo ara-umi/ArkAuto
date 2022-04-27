@@ -3,7 +3,9 @@
 
 import win32con
 import win32gui
+
 from hexHelper import d2xK
+
 
 class HandleGetter(object):
     """
@@ -32,6 +34,20 @@ class HandleGetter(object):
         # 子窗口依次是toolbar，客户区父和标题栏
         clientFatherHandle = win32gui.FindWindowEx(lastNox, 0, None, "Nox")
         clientHandle = win32gui.FindWindowEx(clientFatherHandle, 0, None, "Nox")
+        print(f"模拟器句柄：{d2xK(simulatorHandle, 8)}\n客户区句柄：{d2xK(clientHandle, 8)}")
+        return simulatorHandle, clientHandle
+
+    @staticmethod
+    def Xiaoyao():
+        """
+        逍遥模拟器
+        :return: （模拟器句柄， 客户窗口句柄）
+        """
+        simulatorHandle = win32gui.FindWindow(None, "逍遥模拟器")
+        MainWindow = win32gui.FindWindowEx(simulatorHandle, 0, None, "MainWindowWindow")
+        CenterWindow = win32gui.FindWindowEx(MainWindow, 0, None, "CenterWidgetWindow")
+        Render = win32gui.FindWindowEx(CenterWindow, 0, None, "RenderWindowWindow")
+        clientHandle = Render
         print(f"模拟器句柄：{d2xK(simulatorHandle, 8)}\n客户区句柄：{d2xK(clientHandle, 8)}")
         return simulatorHandle, clientHandle
 
@@ -85,4 +101,6 @@ class HandleGetter(object):
 
 
 if __name__ == '__main__':
-    _, clientHandle = HandleGetter.Nox()
+    # _, clientHandle = HandleGetter.Nox()
+    # _, clientHandle = HandleGetter.LeiDian()
+    HandleGetter.Xiaoyao()
