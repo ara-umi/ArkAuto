@@ -7,7 +7,6 @@ import traceback
 
 import cv2
 import win32con
-import win32gui
 
 import setting
 from arkerror import UnknownError, NoBrainError, AssertError

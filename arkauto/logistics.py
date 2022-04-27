@@ -37,6 +37,7 @@ class Logistics(ArkBase):
         image_path = self.screenshot()
         tiredOverviewCPs = template.get_location(ark_image.tiredOverview, image_path,
                                                  thresh=0.98, flags=1, k=20)
+        print(f"\t本页涣散干员数量: {len(tiredOverviewCPs)}")
         return list(map(lambda x: (x[0] + 55, x[1] - 64), tiredOverviewCPs))
 
     # 通过模板匹配小红脸(列表中，已选中)定位
@@ -87,14 +88,13 @@ class Logistics(ArkBase):
         # 不够就再加上黄脸干员
         else:
             number -= len(tiredInListCPs)
-            littleTiredInListNoFilterCPs = template.get_location(ark_image.littleTiredInList, image_path, thresh=0.98,
-                                                                 flags=1, k=12)
-            littleTiredInListNoFilterCPs.sort(key=lambda x: (x[0], x[1]))
-            littleTiredInListNoFilterCPs = littleTiredInListNoFilterCPs[:number]
+            littleTiredInListCPs = template.get_location(ark_image.littleTiredInList, image_path, thresh=0.98,
+                                                         flags=1, k=12)
+            littleTiredInListCPs.sort(key=lambda x: (x[0], x[1]))
 
             # 检测黄脸干员是否在工作中
-            littleTiredInListCPs = []
-            for littleTiredInListCP in littleTiredInListNoFilterCPs:
+            littleTiredInListFilterCPs = []
+            for littleTiredInListCP in littleTiredInListCPs:
                 CP = littleTiredInListCP
 
                 # 截取整个干员
@@ -106,10 +106,13 @@ class Logistics(ArkBase):
                 # 不在工作中则保留
                 onShiftCP = template.get_location(ark_image.onShift, image_path, thresh=0.9,
                                                   flags=1, k=1)
-                if not onShiftCP:
-                    littleTiredInListCPs.append(CP)
 
-            return tiredInListCPs + littleTiredInListCPs
+                if not onShiftCP:
+                    littleTiredInListFilterCPs.append(CP)
+
+                if len(littleTiredInListFilterCPs) == number:
+                    break
+            return tiredInListCPs + littleTiredInListFilterCPs
 
     # 总览中定位宿舍
     def _findDormitory(self):
@@ -185,7 +188,7 @@ class Logistics(ArkBase):
         if flag:
             print("\n已进入总览")
             # 进入后还不能马上操作
-            time.sleep(2)
+            time.sleep(3)
         else:
             print("\n超时未进入总览")
             raise UnknownError
@@ -215,6 +218,8 @@ class Logistics(ArkBase):
                 print(f"\t已处理待办事项：{backlog[1]}")
                 # 收取后会有动画，等待
                 time.sleep(2)
+            else:
+                print(f"\t未发现待办事项：{backlog[1]}")
         self.simpleClick(notificationCP)
         print("\n已处理所有通知")
         time.sleep(2)  # 等待响应
@@ -249,13 +254,14 @@ class Logistics(ArkBase):
         if not tiredAgentCPs:
             return
 
-        # 记录上一次点击位置，保证一行只点一次，实现不太好，要优化，可能点两次
-        lastClickCP = (None, None)
+        # 记录上一次点击位置(随便设个初始值)，取一个大致范围过滤，保证每次点击位置不在同一行
+        lastClickCP = (0, 0)
         for tiredAgentCP in tiredAgentCPs:
-            if lastClickCP[1] != tiredAgentCP[1]:
+            if not (lastClickCP[1] - 2 <= tiredAgentCP[1] <= lastClickCP[1] + 2):
                 self.simpleClick(tiredAgentCP)
-                # 等待进入图鉴列表，可以增加个进入断言，后续完善
-                time.sleep(1)
+
+                # 等待进入图鉴列表
+                time.sleep(3)
 
                 # 寻找上阵的涣散干员
                 """
@@ -291,15 +297,14 @@ class Logistics(ArkBase):
                         energeticNumber = len(energeticInListCPs)
 
                 # 确认并退出
-                self.simpleClick(ark_position.substitutionConfirm)
                 lastClickCP = tiredAgentCP
+                self.simpleClick(ark_position.substitutionConfirm)
                 self.findButton(ark_image.cancelAgent, wait_time=2)
 
     # 休息一页干员
     def restOnePage(self):
         # 寻找宿舍
         dormitoryCPs = self._findDormitory()
-
         for dormitoryCP in dormitoryCPs:
             # 寻找充沛干员数量，进入宿舍
             energeticNumber, blankNumber = self._findEnergeticNumber(dormitoryCP)
@@ -307,8 +312,8 @@ class Logistics(ArkBase):
             if not total:
                 continue
 
-            # 等待进入
-            time.sleep(1)
+            # 等待进入宿舍
+            time.sleep(3)
 
             # 寻找充沛干员
             energeticCheckedInListCPs = self._findEnergeticCheckedInList(energeticNumber)
@@ -333,17 +338,18 @@ class Logistics(ArkBase):
             self.findButton(ark_image.cancelAgent, wait_time=2)
 
             # 若没有需要休息干员，抛出异常停止脚本
-            if not needRestCPs:
+            if len(needRestCPs) == 0:
                 print("\t您的干员都很精神！")
                 raise NoNeedRestError
-            else:
-                return
+
+        return
 
     # 休息所有干员(从底部开始)
     def restAllPageFromBottom(self):
         print("\n开始更换全部宿舍干员")
         for i in range(7):
             self.restOnePage()
+            time.sleep(1)
             self.pageupOverview(600)
             time.sleep(1)
         print("\n已完成宿舍换人")
@@ -352,7 +358,8 @@ class Logistics(ArkBase):
     def restAllPageFromTop(self):
         for i in range(7):
             self.restOnePage()
-            self.pageupOverview(600)
+            time.sleep(1)
+            self.pagedownOverview(600)
             time.sleep(1)
         print("已完成宿舍换人")
 
@@ -361,17 +368,70 @@ class Logistics(ArkBase):
         print("\n开始更换全部涣散干员")
         for i in range(7):
             self.substitutionOnePage()
+            time.sleep(1)
             self.pagedownOverview(600)
             time.sleep(1)
         print("\n已撤下全部涣散干员")
 
+    # 贸易战加速
+    def accelerateTrade(self):
+        """
+        在点击通知后，整个视图会被拉远，能显示所有的楼层，是方便定位的
+        问题在于如果没有蓝色通知，就无法拉远视图，匹配就会想当困难
+        所以我建议这项行为和收通知一起进行
+        """
+        # 点击加速楼层
+        floorCP = setting.accelerateFloor
+        self.simpleClick(floorCP)
+        inTradingCP = self.findButton(ark_image.inTrading, wait_time=0.5, timeout=3)
+
+        # 如果出现需要收取物资的情况，需要点两次
+        if not inTradingCP:
+            self.simpleClick(floorCP)
+            inTradingCP = self.findButton(ark_image.inTrading, wait_time=0.5, timeout=3)
+
+        print("\n已进入贸易战")
+        if not inTradingCP:
+            print("进入贸易战失败")
+            raise UnknownError
+
+        # 点击获取中
+        self.simpleClick(inTradingCP)
+        time.sleep(2)
+
+        while True:
+            UAV_CP = self.findButton(ark_image.UAV, thresh=0.98, timeout=3)
+            self.simpleClick(UAV_CP)
+            time.sleep(1)
+            flag = self.findButton(ark_image.NoUAV, timeout=1)
+
+            # 如果检测不到无人机为0-0，就加速
+            if not flag:
+                self.simpleClick(ark_position.mostInTradeAccelerate)
+                time.sleep(1)
+                self.simpleClick(ark_position.confirmBlueInTradeAccelerate)
+                time.sleep(2)
+            else:
+                self.simpleClick(ark_position.confirmBlueInTradeAccelerate)
+                time.sleep(2)
+                break
+
+        print("无人机加速完成，退出中")
+        self.simpleClick(ark_position.back)
+        time.sleep(2)
+        self.simpleClick(ark_position.back)
+        time.sleep(2)
+        return
+
+    # 制造站加速
+    def accelerateManufacture(self):
+        pass
+
     def test(self):
-        # 进入总览
-        self._enterOverview()
+        self.accelerateTrade()
 
     @helper.count_time_self
     def run(self):
-        # 不失礼貌的功能介绍
         print("""
 ----------------------------------------------------------------
             非常稳定的明日方舟基建换人脚本
@@ -384,26 +444,14 @@ class Logistics(ArkBase):
 ----------------------------------------------------------------
 
     """)
-        function = input("""
-功能：
-    1、收取提醒(制造、好感、订单)
-    2、更换所有涣散干员
-    3、更换所有宿舍干员(实际上只跑这个功能会bug)
-    4、无人机加速
-    5、收取线索消息
-    0 或 Enter、一条龙(推荐)
+        input("""
+一条龙服务：
+    从主页进入基建 -->> 通知收取 -->> 基建换人 
+    尚未完成加速和线索收集功能
 
-输入:""")
+回车确认:""")
         print()
         helper.print_now_time()
-        try:
-            if not function:
-                function = 0
-            else:
-                function = int(function)
-        except (TypeError, ValueError):
-            print("\t输入错误！")
-            return
 
         # 最小化cmd
         ctypes.windll.user32.ShowWindow(ctypes.windll.kernel32.GetConsoleWindow(), 6)
@@ -412,61 +460,22 @@ class Logistics(ArkBase):
         self.initWindow()
 
         try:
-            if function == 1:
-                # 进入基建
-                self._enterBaseStation()
-                # 收取通知消息
-                self.dealNotification()
-                # 退回到主界面
-                self.simpleClick(ark_position.back)
-                time.sleep(2)
-                self.simpleClick(ark_position.back)
-            elif function == 2:
-                # 进入基建
-                self._enterBaseStation()
-                # 进入总览
-                self._enterOverview()
-                # 从上到下换下涣散干员
-                self.substitutionAllPage()
-                # 退回到主界面
-                self.simpleClick(ark_position.back)
-                time.sleep(2)
-                self.simpleClick(ark_position.back)
-            elif function == 3:
-                # 进入基建
-                self._enterBaseStation()
-                # 进入总览
-                self._enterOverview()
-                # 从上到下填满宿舍
-                time.sleep(1)
-                self.restAllPageFromTop()
-                # 退回到主界面
-                self.simpleClick(ark_position.back)
-                time.sleep(2)
-                self.simpleClick(ark_position.back)
-            elif function == 4:
-                print("傻了吧，我没写")
-            elif function == 5:
-                print("傻了吧，我没写")
-            elif function == 0:
-                # 进入基建
-                self._enterBaseStation()
-                # 收取通知消息
-                self.dealNotification()
-                # 进入总览
-                self._enterOverview()
-                # 从上到下换下涣散干员
-                self.substitutionAllPage()
-                # 从下到上填满宿舍
-                time.sleep(2)
-                self.restAllPageFromBottom()
-                # 退回到主界面
-                self.simpleClick(ark_position.back)
-                time.sleep(2)
-                self.simpleClick(ark_position.back)
-            else:
-                print("\n没有这个功能!")
-                return
+            # 进入基建
+            self._enterBaseStation()
+            # 收取通知消息
+            self.dealNotification()
+            # 进入总览
+            self._enterOverview()
+            # 从上到下换下涣散干员
+            self.substitutionAllPage()
+            # 从下到上填满宿舍
+            time.sleep(2)
+            self.restAllPageFromBottom()
+            # 退回到主界面
+            self.simpleClick(ark_position.back)
+            time.sleep(2)
+            self.simpleClick(ark_position.back)
+
         except NoNeedRestError:
             # 退回到主界面
             self.simpleClick(ark_position.back)
@@ -487,8 +496,5 @@ class Logistics(ArkBase):
 
 if __name__ == '__main__':
     main = Logistics()
-    main.run()
-    # main.test()
-
-
-
+    # main.run()
+    main.test()
