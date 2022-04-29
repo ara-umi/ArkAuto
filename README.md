@@ -19,7 +19,7 @@
 
 - python3.9
 
-- Nox(夜神模拟器)/LeiDian(雷电模拟器)
+- Xiaoyao逍遥模拟器(推荐)/Nox(夜神模拟器)/LeiDian(雷电模拟器)
 
 <h2>运行前我该注意什么？</h2>
 
